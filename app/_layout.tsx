@@ -4,6 +4,8 @@ import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { BiometricGate } from "@/components/biometric-gate";
 import { BiometricPromptProvider } from "@/hooks/biometric-prompt";
+import { getAllBillPayments, getMonthlyBills } from "@/services/api";
+import { syncBillReminders } from "@/services/notifications";
 
 export default function RootLayout() {
   return (
@@ -35,6 +37,23 @@ function RootNavigator() {
     }
   }, [session, loading, segments, router]);
 
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    let cancelled = false;
+    Promise.all([getMonthlyBills(), getAllBillPayments()])
+      .then(([bills, payments]) => {
+        if (!cancelled) {
+          syncBillReminders(bills, payments);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
   if (loading) {
     return null;
   }
@@ -43,6 +62,7 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="bill/[id]" options={{ headerShown: true }} />
     </Stack>
   );
 }

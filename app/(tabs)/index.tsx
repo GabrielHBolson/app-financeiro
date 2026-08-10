@@ -3,16 +3,17 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, Screen } from "@/components/ui";
+import { MonthPicker } from "@/components/month-picker";
 import { useAuth } from "@/hooks/use-auth";
-import { getMonthlyBills, getProfile, getRecentTransactions, getTransactions } from "@/services/api";
+import { getMonthlyBills, getProfile, getTransactions } from "@/services/api";
 import type { MonthlyBill, Profile, Transaction } from "@/services/types";
-import { currentMonthLabel, formatCurrency, formatDate, monthStartISO, todayISO } from "@/utils/format";
+import { currentMonthLabel, formatCurrency, formatDate, monthEndISO, monthStartISO } from "@/utils/format";
 
 export default function DashboardScreen() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [month, setMonth] = useState(() => new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [recent, setRecent] = useState<Transaction[]>([]);
   const [bills, setBills] = useState<MonthlyBill[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -20,17 +21,15 @@ export default function DashboardScreen() {
     if (!user) {
       return;
     }
-    const [p, tx, rx, bl] = await Promise.all([
+    const [p, tx, bl] = await Promise.all([
       getProfile(user.id),
-      getTransactions(monthStartISO(), todayISO()),
-      getRecentTransactions(5),
+      getTransactions(monthStartISO(month), monthEndISO(month)),
       getMonthlyBills(),
     ]);
     setProfile(p);
     setTransactions(tx);
-    setRecent(rx);
     setBills(bl);
-  }, [user]);
+  }, [user, month]);
 
   useFocusEffect(
     useCallback(() => {
@@ -46,7 +45,8 @@ export default function DashboardScreen() {
 
   const income = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const expense = transactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
-  const balance = income - expense;
+  const invested = transactions.filter((t) => t.type === "investment").reduce((sum, t) => sum + t.amount, 0);
+  const balance = income - expense - invested;
   const activeBills = bills.filter((b) => b.active);
   const billsTotal = activeBills.reduce((sum, b) => sum + b.amount, 0);
 
@@ -59,23 +59,31 @@ export default function DashboardScreen() {
       >
         <View style={styles.greeting}>
           <Text style={styles.greetingText}>Olá, {profile?.full_name?.split(" ")[0] || "você"}!</Text>
-          <Text style={styles.greetingSub}>{currentMonthLabel()}</Text>
+          <Text style={styles.greetingSub}>{currentMonthLabel(month)}</Text>
         </View>
+
+        <MonthPicker value={month} onChange={setMonth} />
 
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Saldo do mês</Text>
-          <Text style={[styles.balanceValue, balance < 0 && { color: colors.expense }]}>{formatCurrency(balance)}</Text>
-          <View style={styles.balanceRow}>
-            <View style={styles.balanceItem}>
-              <Ionicons name="arrow-up-circle" size={18} color={colors.income} />
-              <Text style={styles.balanceItemValue}>{formatCurrency(income)}</Text>
-              <Text style={styles.balanceItemLabel}>Recebido</Text>
-            </View>
-            <View style={styles.balanceItem}>
-              <Ionicons name="arrow-down-circle" size={18} color={colors.expense} />
-              <Text style={styles.balanceItemValue}>{formatCurrency(expense)}</Text>
-              <Text style={styles.balanceItemLabel}>Gasto</Text>
-            </View>
+          <Text style={[styles.balanceValue, balance < 0 && { color: "#FFB4B4" }]}>{formatCurrency(balance)}</Text>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Ionicons name="arrow-up-circle" size={20} color={colors.income} />
+            <Text style={styles.statValue}>{formatCurrency(income)}</Text>
+            <Text style={styles.statLabel}>Recebido</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="arrow-down-circle" size={20} color={colors.expense} />
+            <Text style={styles.statValue}>{formatCurrency(expense)}</Text>
+            <Text style={styles.statLabel}>Gasto</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="trending-up" size={20} color={colors.primary} />
+            <Text style={styles.statValue}>{formatCurrency(invested)}</Text>
+            <Text style={styles.statLabel}>Investido</Text>
           </View>
         </View>
 
@@ -89,19 +97,24 @@ export default function DashboardScreen() {
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Últimos lançamentos</Text>
-        {recent.length === 0 ? (
+        <Text style={styles.sectionTitle}>Lançamentos do mês</Text>
+        {transactions.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>Nenhum lançamento ainda. Adicione seu primeiro gasto ou recebido.</Text>
+            <Text style={styles.emptyText}>Nenhum lançamento neste mês.</Text>
           </View>
         ) : (
-          recent.map((t) => (
+          transactions.map((t) => (
             <View key={t.id} style={styles.transactionRow}>
               <View style={styles.transactionInfo}>
                 <Text style={styles.transactionDesc}>{t.description || "Sem descrição"}</Text>
                 <Text style={styles.transactionDate}>{formatDate(t.date)}</Text>
               </View>
-              <Text style={[styles.transactionAmount, t.type === "income" ? styles.incomeAmount : styles.expenseAmount]}>
+              <Text
+                style={[
+                  styles.transactionAmount,
+                  t.type === "income" ? styles.incomeAmount : t.type === "expense" ? styles.expenseAmount : styles.investedAmount,
+                ]}
+              >
                 {t.type === "income" ? "+" : "-"}
                 {formatCurrency(t.amount)}
               </Text>
@@ -135,6 +148,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 16,
     padding: 20,
+    marginBottom: 12,
   },
   balanceLabel: {
     color: "rgba(255,255,255,0.85)",
@@ -147,33 +161,33 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 4,
   },
-  balanceRow: {
+  statsRow: {
     flexDirection: "row",
-    marginTop: 16,
-    gap: 24,
+    gap: 10,
+    marginBottom: 16,
   },
-  balanceItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexWrap: "wrap",
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
   },
-  balanceItemValue: {
-    color: "#FFFFFF",
+  statValue: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
+    color: colors.text,
   },
-  balanceItemLabel: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 13,
-    width: "100%",
-    marginLeft: 24,
+  statLabel: {
+    fontSize: 12,
+    color: colors.muted,
   },
   billsCard: {
     backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
-    marginTop: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -246,5 +260,8 @@ const styles = StyleSheet.create({
   },
   expenseAmount: {
     color: colors.expense,
+  },
+  investedAmount: {
+    color: colors.primary,
   },
 });

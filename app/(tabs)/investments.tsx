@@ -1,10 +1,10 @@
 import { Screen } from "@/components/ui";
 import { TransactionManager } from "@/components/transaction-manager";
 
-export default function IncomeScreen() {
+export default function InvestmentsScreen() {
   return (
     <Screen>
-      <TransactionManager type="income" title="Recebido" />
+      <TransactionManager type="investment" title="Investimento" />
     </Screen>
   );
 }

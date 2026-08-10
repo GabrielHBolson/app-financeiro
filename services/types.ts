@@ -1,4 +1,4 @@
-export type CategoryType = "income" | "expense";
+export type CategoryType = "income" | "expense" | "investment";
 
 export type Profile = {
   id: string;
@@ -34,6 +34,19 @@ export type MonthlyBill = {
   name: string;
   amount: number;
   due_day: number;
+  is_recurring: boolean;
+  total_months: number | null;
+  start_month: string | null;
   active: boolean;
   created_at: string;
+};
+
+export type BillPayment = {
+  id: string;
+  bill_id: string;
+  user_id: string;
+  month: string;
+  amount: number;
+  description: string | null;
+  paid_at: string;
 };

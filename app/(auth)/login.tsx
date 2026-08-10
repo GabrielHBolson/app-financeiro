@@ -29,12 +29,12 @@ export default function LoginScreen() {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <View style={styles.header}>
-          <Text style={styles.title}>App Financeiro</Text>
+          <Text style={styles.title}>Finanças</Text>
           <Text style={styles.subtitle}>Entre com sua conta para continuar</Text>
         </View>
 
         <TextField label="E-mail" value={email} onChangeText={setEmail} placeholder="voce@email.com" keyboardType="email-address" />
-        <TextField label="Senha" value={password} onChangeText={setPassword} placeholder="Sua senha" secureTextEntry />
+        <TextField label="Senha" value={password} onChangeText={setPassword} placeholder="Sua senha" secureTextEntry showPasswordToggle />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 

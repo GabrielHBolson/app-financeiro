@@ -1,0 +1,191 @@
+import { useCallback, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Button, colors } from "@/components/ui";
+import { deleteTransaction, getTransactions } from "@/services/api";
+import type { CategoryType, Transaction } from "@/services/types";
+import { formatCurrency, formatDate, monthEndISO, monthStartISO } from "@/utils/format";
+import { MonthPicker } from "@/components/month-picker";
+import { TransactionForm } from "@/components/transaction-form";
+
+export function TransactionManager({ type, title }: { type: CategoryType; title: string }) {
+  const [month, setMonth] = useState(() => new Date());
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const load = useCallback(async () => {
+    const tx = await getTransactions(monthStartISO(month), monthEndISO(month), type);
+    setTransactions(tx);
+  }, [month, type]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const total = transactions.reduce((sum, t) => sum + t.amount, 0);
+
+  const startNew = () => {
+    setEditing(null);
+    setShowForm((s) => !s);
+  };
+
+  const startEdit = (t: Transaction) => {
+    setEditing(t);
+    setShowForm(true);
+  };
+
+  const handleDelete = (t: Transaction) => {
+    Alert.alert("Excluir lançamento", `Excluir "${t.description || title}" de ${formatCurrency(t.amount)}?`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          const error = await deleteTransaction(t.id);
+          if (error) {
+            Alert.alert("Erro", error);
+            return;
+          }
+          load();
+        },
+      },
+    ]);
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <MonthPicker value={month} onChange={setMonth} />
+
+      <View style={styles.summary}>
+        <Text style={styles.summaryLabel}>Total de {title}s no mês</Text>
+        <Text style={styles.summaryValue}>{formatCurrency(total)}</Text>
+      </View>
+
+      <Button title={showForm ? "Fechar formulário" : `+ Novo ${title}`} onPress={startNew} variant={showForm ? "ghost" : "primary"} />
+
+      {showForm ? (
+        <View style={styles.formCard}>
+          <TransactionForm
+            key={editing?.id ?? "new"}
+            type={type}
+            title={title}
+            editing={editing}
+            onSaved={() => {
+              setShowForm(false);
+              setEditing(null);
+              load();
+            }}
+          />
+        </View>
+      ) : null}
+
+      <Text style={styles.sectionTitle}>Lançamentos do mês</Text>
+
+      {transactions.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>Nenhum {title} neste mês.</Text>
+        </View>
+      ) : (
+        transactions.map((t) => (
+          <View key={t.id} style={styles.row}>
+            <View style={styles.info}>
+              <Text style={styles.desc}>{t.description || "Sem descrição"}</Text>
+              <Text style={styles.date}>{formatDate(t.date)}</Text>
+            </View>
+            <Text style={styles.amount}>{formatCurrency(t.amount)}</Text>
+            <Pressable onPress={() => startEdit(t)} hitSlop={8}>
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
+            </Pressable>
+            <Pressable onPress={() => handleDelete(t)} hitSlop={8}>
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            </Pressable>
+          </View>
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: {
+    paddingBottom: 24,
+  },
+  summary: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  summaryLabel: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 14,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  summaryValue: {
+    color: "#FFFFFF",
+    fontSize: 26,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  formCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: 14,
+    textAlign: "center",
+  },
+  row: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  info: {
+    flex: 1,
+  },
+  desc: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  date: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  amount: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+  },
+});

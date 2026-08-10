@@ -73,12 +73,12 @@ export default function ProfileScreen() {
   };
 
   const handleAddCategory = async () => {
-    if (!categoryName.trim()) {
+    if (!user || !categoryName.trim()) {
       Alert.alert("Dados inválidos", "Informe o nome da categoria.");
       return;
     }
     setSavingCategory(true);
-    const error = await insertCategory({
+    const error = await insertCategory(user.id, {
       name: categoryName.trim(),
       type: categoryType,
       icon: categoryIcon.trim() || undefined,
@@ -160,14 +160,14 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Categorias</Text>
         <View style={styles.card}>
           <View style={styles.segment}>
-            {(["expense", "income"] as const).map((t) => (
+            {(["expense", "income", "investment"] as const).map((t) => (
               <Pressable
                 key={t}
                 style={[styles.segmentButton, categoryType === t && styles.segmentButtonActive]}
                 onPress={() => setCategoryType(t)}
               >
                 <Text style={[styles.segmentText, categoryType === t && styles.segmentTextActive]}>
-                  {t === "expense" ? "Gastos" : "Recebidos"}
+                  {t === "expense" ? "Gastos" : t === "income" ? "Recebidos" : "Investimentos"}
                 </Text>
               </Pressable>
             ))}
@@ -183,8 +183,8 @@ export default function ProfileScreen() {
               <View key={c.id} style={styles.categoryRow}>
                 <Text style={styles.categoryIcon}>{c.icon || "•"}</Text>
                 <Text style={styles.categoryName}>{c.name}</Text>
-                <Text style={[styles.categoryType, c.type === "expense" ? styles.expenseLabel : styles.incomeLabel]}>
-                  {c.type === "expense" ? "Gasto" : "Recebido"}
+                <Text style={[styles.categoryType, c.type === "expense" ? styles.expenseLabel : c.type === "income" ? styles.incomeLabel : styles.investedLabel]}>
+                  {c.type === "expense" ? "Gasto" : c.type === "income" ? "Recebido" : "Investimento"}
                 </Text>
                 <Pressable onPress={() => handleDeleteCategory(c)} hitSlop={8}>
                   <Ionicons name="trash-outline" size={20} color={colors.danger} />
@@ -329,6 +329,9 @@ const styles = StyleSheet.create({
   },
   incomeLabel: {
     color: colors.income,
+  },
+  investedLabel: {
+    color: colors.primary,
   },
   emptyText: {
     color: colors.muted,

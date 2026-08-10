@@ -1,10 +1,10 @@
 import { Screen } from "@/components/ui";
-import { TransactionForm } from "@/components/transaction-form";
+import { TransactionManager } from "@/components/transaction-manager";
 
 export default function ExpenseScreen() {
   return (
     <Screen>
-      <TransactionForm type="expense" title="gasto" />
+      <TransactionManager type="expense" title="Gasto" />
     </Screen>
   );
 }

@@ -4,17 +4,33 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, TextField, colors } from "@/components/ui";
 import { useAuth } from "@/hooks/use-auth";
-import { getCategories, insertTransaction } from "@/services/api";
-import type { Category, CategoryType } from "@/services/types";
+import { getCategories, insertTransaction, updateTransaction } from "@/services/api";
+import type { Category, CategoryType, Transaction } from "@/services/types";
 import { formatCurrency, formatDate, parseAmount, toISODate } from "@/utils/format";
 
-export function TransactionForm({ type, title }: { type: CategoryType; title: string }) {
+export function TransactionForm({
+  type,
+  title,
+  editing,
+  onSaved,
+}: {
+  type: CategoryType;
+  title: string;
+  editing?: Transaction | null;
+  onSaved?: () => void;
+}) {
   const { user } = useAuth();
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState(() => (editing ? String(editing.amount).replace(".", ",") : ""));
+  const [description, setDescription] = useState(() => editing?.description ?? "");
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [date, setDate] = useState(() => new Date());
+  const [categoryId, setCategoryId] = useState<string | null>(() => editing?.category_id ?? null);
+  const [date, setDate] = useState(() => {
+    if (editing) {
+      const [y, m, d] = editing.date.split("-").map(Number);
+      return new Date(y, (m ?? 1) - 1, d ?? 1);
+    }
+    return new Date();
+  });
   const [showDate, setShowDate] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -30,14 +46,17 @@ export function TransactionForm({ type, title }: { type: CategoryType; title: st
       Alert.alert("Valor inválido", "Informe um valor maior que zero.");
       return;
     }
+    if (!user) {
+      return;
+    }
     setSaving(true);
-    const error = await insertTransaction({
-      type,
+    const input = {
       amount: value,
       description,
       date: toISODate(date),
       category_id: categoryId,
-    });
+    };
+    const error = editing ? await updateTransaction(editing.id, input) : await insertTransaction(user.id, { ...input, type });
     setSaving(false);
     if (error) {
       Alert.alert("Erro", error);
@@ -46,7 +65,8 @@ export function TransactionForm({ type, title }: { type: CategoryType; title: st
     setAmount("");
     setDescription("");
     setCategoryId(null);
-    Alert.alert("Pronto!", `${title} registrado com sucesso.`);
+    onSaved?.();
+    Alert.alert("Pronto!", editing ? `${title} atualizado com sucesso.` : `${title} registrado com sucesso.`);
   };
 
   const onDateChange = (event: { type: string }, selected?: Date) => {
@@ -105,7 +125,7 @@ export function TransactionForm({ type, title }: { type: CategoryType; title: st
           <Text style={styles.summaryValue}>{formatCurrency(parseAmount(amount))}</Text>
         </View>
 
-        <Button title={`Salvar ${title}`} onPress={handleSubmit} loading={saving} />
+        <Button title={editing ? `Salvar alterações` : `Salvar ${title}`} onPress={handleSubmit} loading={saving} />
       </View>
     </ScrollView>
   );

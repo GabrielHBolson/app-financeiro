@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 export const colors = {
   primary: "#208AEF",
@@ -23,6 +25,7 @@ export function TextField({
   onChangeText,
   placeholder,
   secureTextEntry,
+  showPasswordToggle,
   keyboardType,
   autoCapitalize,
 }: {
@@ -31,23 +34,34 @@ export function TextField({
   onChangeText: (text: string) => void;
   placeholder?: string;
   secureTextEntry?: boolean;
+  showPasswordToggle?: boolean;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: "none" | "sentences" | "words";
 }) {
+  const [visible, setVisible] = useState(false);
+  const masked = secureTextEntry && !visible;
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.muted}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize ?? "none"}
-        autoCorrect={false}
-      />
+      <View style={styles.inputWrap}>
+        <TextInput
+          style={[styles.input, showPasswordToggle && styles.inputWithToggle]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.muted}
+          secureTextEntry={masked}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize ?? "none"}
+          autoCorrect={false}
+        />
+        {showPasswordToggle ? (
+          <Pressable onPress={() => setVisible((v) => !v)} hitSlop={8} style={styles.toggle} accessibilityRole="button" accessibilityLabel={visible ? "Ocultar senha" : "Mostrar senha"}>
+            <Ionicons name={visible ? "eye-off-outline" : "eye-outline"} size={20} color={colors.muted} />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -92,6 +106,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 6,
   },
+  inputWrap: {
+    position: "relative",
+  },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -101,6 +118,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: colors.text,
+  },
+  inputWithToggle: {
+    paddingRight: 44,
+  },
+  toggle: {
+    position: "absolute",
+    right: 4,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   button: {
     borderRadius: 10,

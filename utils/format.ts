@@ -11,20 +11,24 @@ export function parseAmount(input: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function todayISO(): string {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
-}
-
 export function monthStartISO(date = new Date()): string {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const offset = first.getTimezoneOffset();
   return new Date(first.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
-export function currentMonthLabel(): string {
-  return new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+export function monthEndISO(date = new Date()): string {
+  const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const offset = last.getTimezoneOffset();
+  return new Date(last.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+
+export function addMonths(date: Date, delta: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+}
+
+export function currentMonthLabel(date = new Date()): string {
+  return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
 export function formatDate(isoDate: string): string {
