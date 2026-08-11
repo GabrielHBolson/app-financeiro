@@ -5,9 +5,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, Screen } from "@/components/ui";
 import { MonthPicker } from "@/components/month-picker";
 import { useAuth } from "@/hooks/use-auth";
-import { getMonthlyBills, getProfile, getTransactions } from "@/services/api";
-import type { MonthlyBill, Profile, Transaction } from "@/services/types";
+import { getBillPaymentsBetween, getMonthlyBills, getProfile, getTransactions } from "@/services/api";
+import type { BillPayment, MonthlyBill, Profile, Transaction } from "@/services/types";
 import { currentMonthLabel, formatCurrency, formatDate, monthEndISO, monthStartISO } from "@/utils/format";
+import { summarizeBillsForMonth } from "@/utils/bills";
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -15,20 +16,23 @@ export default function DashboardScreen() {
   const [month, setMonth] = useState(() => new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bills, setBills] = useState<MonthlyBill[]>([]);
+  const [payments, setPayments] = useState<BillPayment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) {
       return;
     }
-    const [p, tx, bl] = await Promise.all([
+    const [p, tx, bl, pl] = await Promise.all([
       getProfile(user.id),
       getTransactions(monthStartISO(month), monthEndISO(month)),
       getMonthlyBills(),
+      getBillPaymentsBetween(monthStartISO(month), monthEndISO(month)),
     ]);
     setProfile(p);
     setTransactions(tx);
     setBills(bl);
+    setPayments(pl);
   }, [user, month]);
 
   useFocusEffect(
@@ -46,9 +50,9 @@ export default function DashboardScreen() {
   const income = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const expense = transactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const invested = transactions.filter((t) => t.type === "investment").reduce((sum, t) => sum + t.amount, 0);
-  const balance = income - expense - invested;
-  const activeBills = bills.filter((b) => b.active);
-  const billsTotal = activeBills.reduce((sum, b) => sum + b.amount, 0);
+  const billsSummary = summarizeBillsForMonth(bills, payments, month);
+  const billsPaid = billsSummary.paidTotal;
+  const balance = income - expense - billsPaid - invested;
 
   return (
     <Screen>
@@ -81,6 +85,11 @@ export default function DashboardScreen() {
             <Text style={styles.statLabel}>Gasto</Text>
           </View>
           <View style={styles.statCard}>
+            <Ionicons name="receipt-outline" size={20} color={colors.primary} />
+            <Text style={styles.statValue}>{formatCurrency(billsPaid)}</Text>
+            <Text style={styles.statLabel}>Contas pagas</Text>
+          </View>
+          <View style={styles.statCard}>
             <Ionicons name="trending-up" size={20} color={colors.primary} />
             <Text style={styles.statValue}>{formatCurrency(invested)}</Text>
             <Text style={styles.statLabel}>Investido</Text>
@@ -93,7 +102,7 @@ export default function DashboardScreen() {
             <Text style={styles.billsTitle}>Contas do mês</Text>
           </View>
           <Text style={styles.billsValue}>
-            {activeBills.length} {activeBills.length === 1 ? "conta ativa" : "contas ativas"} · {formatCurrency(billsTotal)}
+            {billsSummary.paidCount} de {billsSummary.expectedCount} pagas · {formatCurrency(billsSummary.paidTotal)} pagos de {formatCurrency(billsSummary.expectedTotal)}
           </Text>
         </View>
 
@@ -163,11 +172,13 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginBottom: 16,
   },
   statCard: {
-    flex: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
     backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,

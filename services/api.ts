@@ -169,6 +169,19 @@ export async function getAllBillPayments(): Promise<BillPayment[]> {
   return data.map(mapBillPayment);
 }
 
+export async function getBillPaymentsBetween(from: string, to: string): Promise<BillPayment[]> {
+  const { data, error } = await supabase
+    .from("bill_payments")
+    .select("*")
+    .gte("month", from)
+    .lte("month", to)
+    .order("month", { ascending: false });
+  if (error) {
+    return [];
+  }
+  return data.map(mapBillPayment);
+}
+
 export async function markBillPaid(
   userId: string,
   input: { bill_id: string; month: string; amount: number; description?: string | null }

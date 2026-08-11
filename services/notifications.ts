@@ -34,8 +34,12 @@ export function computeNextDueDate(bill: MonthlyBill, paidMonths: Set<string>): 
   if (!bill.is_recurring && bill.total_months != null && paidCount >= bill.total_months) {
     return null;
   }
+  const startMonth = bill.is_recurring ? null : new Date(`${bill.start_month}T12:00:00`);
   for (let i = 0; i < 24; i++) {
     const base = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    if (startMonth && base.getTime() < startMonth.getTime()) {
+      continue;
+    }
     const due = dueDateForMonth(base.getFullYear(), base.getMonth(), bill.due_day);
     const monthKey = monthStartISO(base);
     if (due.getTime() <= now.getTime()) {

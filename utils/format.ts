@@ -36,6 +36,10 @@ export function formatDate(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
+export function formatPaidAt(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
 export function toISODate(date: Date): string {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 10);

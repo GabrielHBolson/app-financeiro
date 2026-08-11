@@ -3,22 +3,36 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, colors } from "@/components/ui";
-import { deleteTransaction, getTransactions } from "@/services/api";
-import type { CategoryType, Transaction } from "@/services/types";
+import { deleteTransaction, getBillPaymentsBetween, getMonthlyBills, getTransactions, markBillPaid, undoBillPayment } from "@/services/api";
+import type { BillPayment, CategoryType, MonthlyBill, Transaction } from "@/services/types";
 import { formatCurrency, formatDate, monthEndISO, monthStartISO } from "@/utils/format";
 import { MonthPicker } from "@/components/month-picker";
 import { TransactionForm } from "@/components/transaction-form";
+import { BillPaymentRow } from "@/components/bill-payment-row";
+import { syncBillReminders } from "@/services/notifications";
+import { useAuth } from "@/hooks/use-auth";
+import { summarizeBillsForMonth, getBillOccurrence } from "@/utils/bills";
 
-export function TransactionManager({ type, title }: { type: CategoryType; title: string }) {
+export function TransactionManager({ type, title, showBills }: { type: CategoryType; title: string; showBills?: boolean }) {
+  const { user } = useAuth();
   const [month, setMonth] = useState(() => new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [bills, setBills] = useState<MonthlyBill[]>([]);
+  const [payments, setPayments] = useState<BillPayment[]>([]);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
-    const tx = await getTransactions(monthStartISO(month), monthEndISO(month), type);
-    setTransactions(tx);
-  }, [month, type]);
+    const tx = getTransactions(monthStartISO(month), monthEndISO(month), type);
+    if (!showBills) {
+      setTransactions(await tx);
+      return;
+    }
+    const [txList, bl, pl] = await Promise.all([tx, getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
+    setTransactions(txList);
+    setBills(bl);
+    setPayments(pl);
+  }, [month, type, showBills]);
 
   useFocusEffect(
     useCallback(() => {
@@ -27,6 +41,28 @@ export function TransactionManager({ type, title }: { type: CategoryType; title:
   );
 
   const total = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const billsSummary = summarizeBillsForMonth(bills, payments, month);
+  const paidMap = new Map(payments.map((p) => [p.bill_id, p]));
+  const monthBills = bills
+    .filter((b) => b.active && getBillOccurrence(b, month))
+    .sort((a, b) => a.due_day - b.due_day);
+
+  const handleBillToggle = async (bill: MonthlyBill) => {
+    if (!user) {
+      return;
+    }
+    const monthKey = monthStartISO(month);
+    const alreadyPaid = paidMap.has(bill.id);
+    const error = alreadyPaid ? await undoBillPayment(bill.id, monthKey) : await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (error) {
+      Alert.alert("Erro", error);
+      return;
+    }
+    const [bl, pl] = await Promise.all([getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
+    setBills(bl);
+    setPayments(pl);
+    syncBillReminders(bl, pl);
+  };
 
   const startNew = () => {
     setEditing(null);
@@ -106,6 +142,30 @@ export function TransactionManager({ type, title }: { type: CategoryType; title:
           </View>
         ))
       )}
+
+      {showBills ? (
+        <>
+          <Text style={styles.sectionTitle}>Contas do mês</Text>
+          <Text style={styles.billsSummary}>
+            {billsSummary.paidCount} de {billsSummary.expectedCount} pagas · {formatCurrency(billsSummary.paidTotal)} pagos
+          </Text>
+          {monthBills.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>Nenhuma conta neste mês.</Text>
+            </View>
+          ) : (
+            monthBills.map((bill) => (
+              <BillPaymentRow
+                key={bill.id}
+                bill={bill}
+                payment={paidMap.get(bill.id)}
+                month={month}
+                onToggle={() => handleBillToggle(bill)}
+              />
+            ))
+          )}
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -187,5 +247,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: colors.text,
+  },
+  billsSummary: {
+    fontSize: 13,
+    color: colors.muted,
+    fontWeight: "600",
+    marginBottom: 12,
   },
 });

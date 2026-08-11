@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextIn
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen, colors } from "@/components/ui";
-import { MonthPicker } from "@/components/month-picker";
 import {
   getAllBillPayments,
   getBillPayments,
@@ -16,19 +15,20 @@ import {
 import type { BillPayment, MonthlyBill } from "@/services/types";
 import { useAuth } from "@/hooks/use-auth";
 import { syncBillReminders } from "@/services/notifications";
-import { addMonths, currentMonthLabel, formatCurrency, monthStartISO } from "@/utils/format";
+import { addMonths, currentMonthLabel, formatCurrency, formatPaidAt, monthStartISO } from "@/utils/format";
+import { buildMonthWindow } from "@/utils/bills";
 
 function PaymentRow({
-  label,
-  monthDate,
+  title,
+  subtitle,
   monthKey,
   amount,
   paid,
   onToggle,
   onSaveDescription,
 }: {
-  label: string;
-  monthDate: Date;
+  title: string;
+  subtitle?: string;
   monthKey: string;
   amount: number;
   paid: BillPayment | undefined;
@@ -39,8 +39,11 @@ function PaymentRow({
     <View style={styles.monthRow}>
       <Pressable style={styles.monthMain} onPress={() => onToggle(monthKey)}>
         <View style={styles.monthInfo}>
-          <Text style={styles.monthLabel}>{label}</Text>
-          <Text style={[styles.monthName, paid && styles.monthNamePaid]}>{currentMonthLabel(monthDate)}</Text>
+          <Text style={styles.monthTitle}>{title}</Text>
+          {subtitle ? <Text style={styles.monthSub}>{subtitle}</Text> : null}
+          <Text style={paid ? styles.monthStatusPaid : styles.monthStatusPending}>
+            {paid ? `Pago em ${formatPaidAt(paid.paid_at)}` : "Não pago"}
+          </Text>
         </View>
         <View style={styles.monthRight}>
           <Text style={[styles.monthAmount, paid && styles.monthAmountPaid]}>{formatCurrency(amount)}</Text>
@@ -71,7 +74,6 @@ export default function BillDetailScreen() {
   const [bill, setBill] = useState<MonthlyBill | null>(null);
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date());
 
   const reload = useCallback(async () => {
     if (!id) {
@@ -151,11 +153,22 @@ export default function BillDetailScreen() {
 
   const renderInstallment = ({ item }: { item: { date: Date; key: string; index: number } }) => (
     <PaymentRow
-      label={`Parcela ${item.index + 1}`}
-      monthDate={item.date}
+      title={`Parcela ${item.index + 1}/${bill?.total_months ?? item.index + 1}`}
+      subtitle={currentMonthLabel(item.date)}
       monthKey={item.key}
       amount={bill?.amount ?? 0}
       paid={paidMap.get(item.key)}
+      onToggle={handleToggle}
+      onSaveDescription={handleSaveDescription}
+    />
+  );
+
+  const renderHistory = ({ item }: { item: Date }) => (
+    <PaymentRow
+      title={currentMonthLabel(item)}
+      monthKey={monthStartISO(item)}
+      amount={bill?.amount ?? 0}
+      paid={paidMap.get(monthStartISO(item))}
       onToggle={handleToggle}
       onSaveDescription={handleSaveDescription}
     />
@@ -181,6 +194,7 @@ export default function BillDetailScreen() {
 
   const paidCount = payments.length;
   const isTerm = !bill.is_recurring && bill.total_months != null;
+  const history = bill.is_recurring ? buildMonthWindow(12) : [];
 
   return (
     <Screen>
@@ -222,15 +236,13 @@ export default function BillDetailScreen() {
         </>
       ) : (
         <>
-          <MonthPicker value={selectedMonth} onChange={setSelectedMonth} />
-          <PaymentRow
-            label={currentMonthLabel(selectedMonth)}
-            monthDate={selectedMonth}
-            monthKey={monthStartISO(selectedMonth)}
-            amount={bill.amount}
-            paid={paidMap.get(monthStartISO(selectedMonth))}
-            onToggle={handleToggle}
-            onSaveDescription={handleSaveDescription}
+          <Text style={styles.sectionTitle}>Histórico</Text>
+          <FlatList
+            data={history}
+            keyExtractor={(item) => monthStartISO(item)}
+            showsVerticalScrollIndicator={false}
+            renderItem={renderHistory}
+            ListFooterComponent={<View style={{ height: 40 }} />}
           />
         </>
       )}
@@ -292,22 +304,28 @@ const styles = StyleSheet.create({
   monthInfo: {
     flex: 1,
   },
-  monthLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.muted,
-    textTransform: "uppercase",
-  },
-  monthName: {
+  monthTitle: {
     fontSize: 15,
     fontWeight: "600",
     color: colors.text,
+    textTransform: "capitalize",
+  },
+  monthSub: {
+    fontSize: 13,
+    color: colors.muted,
     marginTop: 2,
     textTransform: "capitalize",
   },
-  monthNamePaid: {
-    textDecorationLine: "line-through",
+  monthStatusPaid: {
+    fontSize: 13,
+    color: colors.success,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  monthStatusPending: {
+    fontSize: 13,
     color: colors.muted,
+    marginTop: 2,
   },
   monthRight: {
     flexDirection: "row",
