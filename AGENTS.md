@@ -96,6 +96,7 @@ App mobile de finanças pessoais (Android/iOS), interface em português (pt-BR) 
 - Header com avatar (ícone pessoa), nome (`profile.full_name` ou "Usuário") e e-mail.
 - Card "Nome": mostra valor + link "Editar" → vira `TextField` + botão "Salvar" (`updateProfileName`).
 - Card "Desbloqueio com biometria": `Switch`; se ativar sem hardware/enrolamento → `Alert` "Seu aparelho não tem biometria..."; muda flag em SecureStore (`setBiometricEnabled`).
+- Card "Tema": segmento Claro/Escuro/Sistema (`setMode`), persistido via `saveThemeMode`.
 - Seção "Categorias":
   - Segmento Gastos/Recebidos/Investimentos (filtra o tipo novo).
   - Campo "Nome da categoria" + "Ícone (emoji, opcional)" + botão "Adicionar categoria" (`insertCategory`).
@@ -119,7 +120,8 @@ Tipos TS correspondentes em `services/types.ts`.
 
 ## Convenções de código
 
-- UI no `components/ui.tsx`: paleta `colors` (primary `#208AEF`), `Screen`, `TextField`, `Button`.
+- UI no `components/ui.tsx`: `Screen`, `TextField`, `Button`. Cores via `useTheme()` de `hooks/use-theme.tsx` (paletas `lightColors`/`darkColors`, primary `#208AEF`/`#3B9DF2`); não existe export estático `colors`.
+- Tema: `ThemeProvider` no layout raiz (Sistema/Claro/Escuro, persistido em SecureStore via `utils/theme.ts`). Todos os estilos de tela usam `useTheme()` e um `createStyles(colors)` memoizado. `navTheme` (React Navigation) alimenta headers/tab bar; `StatusBar` em `_layout` usa `style={isDark ? "light" : "dark"}`. Card "Tema" no Perfil (segmento Claro/Escuro/Sistema).
 - Helpers de moeda/data no `utils/format.ts` (`formatCurrency`, `parseAmount`, `monthStartISO`, `monthEndISO`, `addMonths`, `currentMonthLabel`, `formatDate`, `formatPaidAt`, `toISODate`).
 - Regras de contas em `utils/bills.ts`: `getBillOccurrence` (ocorrência de uma conta num mês; `installment`/`totalMonths` para parceladas), `buildMonthWindow` (meses do histórico) e `summarizeBillsForMonth` (totais de contas esperadas/pagas/pendentes do mês, considerando apenas contas ativas com ocorrência).
 - Componente de linha de conta `components/bill-payment-row.tsx` (`BillPaymentRow`), compartilhado entre Contas e Gastos.

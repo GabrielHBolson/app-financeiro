@@ -1,7 +1,51 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { addMonths, currentMonthLabel } from "@/utils/format";
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 16,
+    },
+    arrow: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    label: {
+      flex: 1,
+      textAlign: "center",
+      fontSize: 17,
+      fontWeight: "700",
+      color: colors.text,
+      textTransform: "capitalize",
+    },
+    todayBadge: {
+      borderRadius: 14,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    todayText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: colors.primary,
+    },
+  });
+}
 
 export function MonthPicker({
   value,
@@ -10,6 +54,9 @@ export function MonthPicker({
   value: Date;
   onChange: (date: Date) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isCurrentMonth = (() => {
     const now = new Date();
     return now.getFullYear() === value.getFullYear() && now.getMonth() === value.getMonth();
@@ -36,44 +83,3 @@ export function MonthPicker({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  arrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  label: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.text,
-    textTransform: "capitalize",
-  },
-  todayBadge: {
-    borderRadius: 14,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  todayText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-});

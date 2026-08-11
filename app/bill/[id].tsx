@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Screen, colors } from "@/components/ui";
+import { Screen } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import {
   getAllBillPayments,
   getBillPayments,
@@ -18,6 +19,115 @@ import { syncBillReminders } from "@/services/notifications";
 import { addMonths, currentMonthLabel, formatCurrency, formatPaidAt, monthStartISO } from "@/utils/format";
 import { buildMonthWindow } from "@/utils/bills";
 
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    center: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    summary: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+    },
+    summaryName: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    summaryValue: {
+      color: "#FFFFFF",
+      fontSize: 26,
+      fontWeight: "800",
+      marginTop: 4,
+    },
+    summaryMeta: {
+      color: "rgba(255,255,255,0.9)",
+      fontSize: 13,
+      marginTop: 4,
+    },
+    summaryMetaPaused: {
+      color: "#FBBF24",
+      fontSize: 13,
+      fontWeight: "700",
+      marginTop: 4,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: 12,
+    },
+    monthRow: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    monthMain: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    monthInfo: {
+      flex: 1,
+    },
+    monthTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+      textTransform: "capitalize",
+    },
+    monthSub: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+      textTransform: "capitalize",
+    },
+    monthStatusPaid: {
+      fontSize: 13,
+      color: colors.success,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+    monthStatusPending: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    monthRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    monthAmount: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    monthAmountPaid: {
+      color: colors.success,
+    },
+    descInput: {
+      marginTop: 10,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: colors.text,
+    },
+    emptyText: {
+      color: colors.muted,
+      fontSize: 15,
+    },
+  });
+}
+
 function PaymentRow({
   title,
   subtitle,
@@ -26,6 +136,8 @@ function PaymentRow({
   paid,
   onToggle,
   onSaveDescription,
+  colors,
+  styles,
 }: {
   title: string;
   subtitle?: string;
@@ -34,6 +146,8 @@ function PaymentRow({
   paid: BillPayment | undefined;
   onToggle: (monthKey: string) => void;
   onSaveDescription: (monthKey: string, text: string) => void;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={styles.monthRow}>
@@ -47,11 +161,7 @@ function PaymentRow({
         </View>
         <View style={styles.monthRight}>
           <Text style={[styles.monthAmount, paid && styles.monthAmountPaid]}>{formatCurrency(amount)}</Text>
-          <Ionicons
-            name={paid ? "checkmark-circle" : "checkmark-circle-outline"}
-            size={26}
-            color={paid ? colors.success : colors.muted}
-          />
+          <Ionicons name={paid ? "checkmark-circle" : "checkmark-circle-outline"} size={26} color={paid ? colors.success : colors.muted} />
         </View>
       </Pressable>
       {paid ? (
@@ -69,6 +179,8 @@ function PaymentRow({
 }
 
 export default function BillDetailScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [bill, setBill] = useState<MonthlyBill | null>(null);
@@ -131,9 +243,7 @@ export default function BillDetailScreen() {
       return;
     }
     const existing = paidMap.get(monthKey);
-    const error = existing
-      ? await undoBillPayment(bill.id, monthKey)
-      : await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    const error = existing ? await undoBillPayment(bill.id, monthKey) : await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
     if (error) {
       Alert.alert("Erro", error);
       return;
@@ -160,6 +270,8 @@ export default function BillDetailScreen() {
       paid={paidMap.get(item.key)}
       onToggle={handleToggle}
       onSaveDescription={handleSaveDescription}
+      colors={colors}
+      styles={styles}
     />
   );
 
@@ -171,6 +283,8 @@ export default function BillDetailScreen() {
       paid={paidMap.get(monthStartISO(item))}
       onToggle={handleToggle}
       onSaveDescription={handleSaveDescription}
+      colors={colors}
+      styles={styles}
     />
   );
 
@@ -249,110 +363,3 @@ export default function BillDetailScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  summary: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  summaryName: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  summaryValue: {
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  summaryMeta: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 13,
-    marginTop: 4,
-  },
-  summaryMetaPaused: {
-    color: "#FBBF24",
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-    marginBottom: 12,
-  },
-  monthRow: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  monthMain: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  monthInfo: {
-    flex: 1,
-  },
-  monthTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
-    textTransform: "capitalize",
-  },
-  monthSub: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-    textTransform: "capitalize",
-  },
-  monthStatusPaid: {
-    fontSize: 13,
-    color: colors.success,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  monthStatusPending: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  monthRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  monthAmount: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  monthAmountPaid: {
-    color: colors.success,
-  },
-  descInput: {
-    marginTop: 10,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.text,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 15,
-  },
-});

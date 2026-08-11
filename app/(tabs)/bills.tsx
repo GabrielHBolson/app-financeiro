@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Button, Screen, TextField, colors } from "@/components/ui";
+import { Button, Screen, TextField } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { MonthPicker } from "@/components/month-picker";
 import { BillPaymentRow } from "@/components/bill-payment-row";
 import {
@@ -20,7 +21,107 @@ import { ensureNotificationPermission, syncBillReminders } from "@/services/noti
 import { formatCurrency, monthEndISO, monthStartISO, parseAmount } from "@/utils/format";
 import { getBillOccurrence, summarizeBillsForMonth } from "@/utils/bills";
 
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    summary: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+    },
+    summaryLabel: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    summaryValue: {
+      color: "#FFFFFF",
+      fontSize: 26,
+      fontWeight: "800",
+      marginTop: 4,
+    },
+    totalsRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 14,
+    },
+    totalBox: {
+      flex: 1,
+      backgroundColor: "rgba(255,255,255,0.12)",
+      borderRadius: 12,
+      padding: 12,
+    },
+    totalLabel: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    totalPaid: {
+      color: "#BBF7D0",
+      fontSize: 18,
+      fontWeight: "800",
+      marginTop: 2,
+    },
+    totalPending: {
+      color: "#FFB4B4",
+      fontSize: 18,
+      fontWeight: "800",
+      marginTop: 2,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 16,
+    },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    switchText: {
+      flex: 1,
+      marginRight: 12,
+    },
+    switchTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    switchHint: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.text,
+      marginTop: 24,
+      marginBottom: 12,
+      textTransform: "capitalize",
+    },
+    emptyCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    emptyText: {
+      color: colors.muted,
+      fontSize: 14,
+      textAlign: "center",
+    },
+  });
+}
+
 export default function BillsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
   const router = useRouter();
   const [month, setMonth] = useState(() => new Date());
@@ -36,10 +137,7 @@ export default function BillsScreen() {
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
-    const [bl, pl] = await Promise.all([
-      getMonthlyBills(),
-      getBillPaymentsBetween(monthStartISO(month), monthEndISO(month)),
-    ]);
+    const [bl, pl] = await Promise.all([getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
     setBills(bl);
     setPayments(pl);
   }, [month]);
@@ -51,18 +149,13 @@ export default function BillsScreen() {
   );
 
   const refresh = async () => {
-    const [bl, pl] = await Promise.all([
-      getMonthlyBills(),
-      getBillPaymentsBetween(monthStartISO(month), monthEndISO(month)),
-    ]);
+    const [bl, pl] = await Promise.all([getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
     setBills(bl);
     setPayments(pl);
     syncBillReminders(bl, pl);
   };
 
-  const monthBills = bills
-    .filter((b) => b.active && getBillOccurrence(b, month))
-    .sort((a, b) => a.due_day - b.due_day);
+  const monthBills = bills.filter((b) => b.active && getBillOccurrence(b, month)).sort((a, b) => a.due_day - b.due_day);
 
   const paidMap = new Map(payments.map((p) => [p.bill_id, p]));
   const summary = summarizeBillsForMonth(bills, payments, month);
@@ -218,7 +311,9 @@ export default function BillsScreen() {
               </View>
             ) : null}
 
-            <Text style={styles.sectionTitle}>Contas de {new Date(month.getFullYear(), month.getMonth(), 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</Text>
+            <Text style={styles.sectionTitle}>
+              Contas de {new Date(month.getFullYear(), month.getMonth(), 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+            </Text>
           </View>
         }
         ListEmptyComponent={
@@ -231,99 +326,3 @@ export default function BillsScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  summary: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  summaryLabel: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  summaryValue: {
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  totalsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
-  },
-  totalBox: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 12,
-    padding: 12,
-  },
-  totalLabel: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  totalPaid: {
-    color: "#BBF7D0",
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  totalPending: {
-    color: "#FFB4B4",
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginTop: 16,
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  switchText: {
-    flex: 1,
-    marginRight: 12,
-  },
-  switchTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  switchHint: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-    marginTop: 24,
-    marginBottom: 12,
-    textTransform: "capitalize",
-  },
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 14,
-    textAlign: "center",
-  },
-});

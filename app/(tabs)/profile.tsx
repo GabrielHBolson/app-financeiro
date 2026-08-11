@@ -1,15 +1,174 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Button, Screen, TextField, colors } from "@/components/ui";
+import { Button, Screen, TextField } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
 import { deleteCategory, getCategories, getProfile, insertCategory, updateProfileName } from "@/services/api";
 import type { Category, CategoryType, Profile } from "@/services/types";
+import type { ThemeMode } from "@/utils/theme";
 import { canUseBiometrics, isBiometricEnabled, setBiometricEnabled } from "@/utils/biometrics";
 
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    avatarRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+      marginBottom: 20,
+    },
+    avatar: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: colors.tint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarInfo: {
+      flex: 1,
+    },
+    name: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: colors.text,
+    },
+    email: {
+      fontSize: 14,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 12,
+    },
+    cardRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    cardRowText: {
+      flex: 1,
+      marginRight: 12,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    cardValue: {
+      fontSize: 15,
+      color: colors.muted,
+      flex: 1,
+      marginRight: 12,
+    },
+    cardHint: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    cardLink: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    nameEdit: {
+      flex: 1,
+      gap: 8,
+    },
+    themeSegment: {
+      flexDirection: "row",
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      padding: 4,
+      marginTop: 12,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.text,
+      marginTop: 8,
+      marginBottom: 12,
+    },
+    segment: {
+      flexDirection: "row",
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      padding: 4,
+      marginBottom: 16,
+    },
+    segmentButton: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderRadius: 8,
+    },
+    segmentButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    segmentText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.muted,
+    },
+    segmentTextActive: {
+      color: "#FFFFFF",
+    },
+    categoryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    categoryIcon: {
+      fontSize: 20,
+    },
+    categoryName: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    categoryType: {
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    expenseLabel: {
+      color: colors.expense,
+    },
+    incomeLabel: {
+      color: colors.income,
+    },
+    investedLabel: {
+      color: colors.primary,
+    },
+    emptyText: {
+      color: colors.muted,
+      fontSize: 14,
+      fontStyle: "italic",
+      marginBottom: 16,
+    },
+  });
+}
+
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: "light", label: "Claro" },
+  { value: "dark", label: "Escuro" },
+  { value: "system", label: "Sistema" },
+];
+
 export default function ProfileScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, signOut } = useAuth();
+  const { mode, setMode } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState("");
   const [editingName, setEditingName] = useState(false);
@@ -31,11 +190,7 @@ export default function ProfileScreen() {
     if (p?.full_name) {
       setName(p.full_name);
     }
-    const [enabled, available, cats] = await Promise.all([
-      isBiometricEnabled(),
-      canUseBiometrics(),
-      getCategories(),
-    ]);
+    const [enabled, available, cats] = await Promise.all([isBiometricEnabled(), canUseBiometrics(), getCategories()]);
     setBiometricEnabledState(enabled);
     setBiometricAvailable(available);
     setCategories(cats);
@@ -149,11 +304,27 @@ export default function ProfileScreen() {
               <Text style={styles.cardTitle}>Desbloqueio com biometria</Text>
               <Text style={styles.cardHint}>Peça sua digital ou rosto ao abrir o app.</Text>
             </View>
-            <Switch
-              value={biometricEnabled}
-              onValueChange={handleToggleBiometric}
-              trackColor={{ true: colors.primary }}
-            />
+            <Switch value={biometricEnabled} onValueChange={handleToggleBiometric} trackColor={{ true: colors.primary }} />
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.cardRow}>
+            <View style={styles.cardRowText}>
+              <Text style={styles.cardTitle}>Tema</Text>
+              <Text style={styles.cardHint}>Claro, escuro ou segue o sistema.</Text>
+            </View>
+          </View>
+          <View style={styles.themeSegment}>
+            {THEME_OPTIONS.map((option) => (
+              <Pressable
+                key={option.value}
+                style={[styles.segmentButton, mode === option.value && styles.segmentButtonActive]}
+                onPress={() => setMode(option.value)}
+              >
+                <Text style={[styles.segmentText, mode === option.value && styles.segmentTextActive]}>{option.label}</Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -161,11 +332,7 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <View style={styles.segment}>
             {(["expense", "income", "investment"] as const).map((t) => (
-              <Pressable
-                key={t}
-                style={[styles.segmentButton, categoryType === t && styles.segmentButtonActive]}
-                onPress={() => setCategoryType(t)}
-              >
+              <Pressable key={t} style={[styles.segmentButton, categoryType === t && styles.segmentButtonActive]} onPress={() => setCategoryType(t)}>
                 <Text style={[styles.segmentText, categoryType === t && styles.segmentTextActive]}>
                   {t === "expense" ? "Gastos" : t === "income" ? "Recebidos" : "Investimentos"}
                 </Text>
@@ -201,142 +368,3 @@ export default function ProfileScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  avatarRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#E6F4FE",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInfo: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  email: {
-    fontSize: 14,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 12,
-  },
-  cardRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  cardRowText: {
-    flex: 1,
-    marginRight: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  cardValue: {
-    fontSize: 15,
-    color: colors.muted,
-    flex: 1,
-    marginRight: 12,
-  },
-  cardHint: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  cardLink: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  nameEdit: {
-    flex: 1,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  segment: {
-    flexDirection: "row",
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 16,
-  },
-  segmentButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 8,
-  },
-  segmentButtonActive: {
-    backgroundColor: colors.primary,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.muted,
-  },
-  segmentTextActive: {
-    color: "#FFFFFF",
-  },
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  categoryIcon: {
-    fontSize: 20,
-  },
-  categoryName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  categoryType: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  expenseLabel: {
-    color: colors.expense,
-  },
-  incomeLabel: {
-    color: colors.income,
-  },
-  investedLabel: {
-    color: colors.primary,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 14,
-    fontStyle: "italic",
-    marginBottom: 16,
-  },
-});

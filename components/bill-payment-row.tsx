@@ -1,9 +1,56 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import type { BillPayment, MonthlyBill } from "@/services/types";
 import { formatCurrency, formatPaidAt } from "@/utils/format";
 import { getBillOccurrence } from "@/utils/bills";
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    info: {
+      flex: 1,
+    },
+    name: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    meta: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    installment: {
+      fontSize: 12,
+      color: colors.primary,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+    paidText: {
+      fontSize: 13,
+      color: colors.success,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+    pendingText: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+    },
+  });
+}
 
 export function BillPaymentRow({
   bill,
@@ -22,6 +69,8 @@ export function BillPaymentRow({
   disabled?: boolean;
   right?: React.ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const occurrence = getBillOccurrence(bill, month);
 
   return (
@@ -51,47 +100,3 @@ export function BillPaymentRow({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  info: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  meta: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  installment: {
-    fontSize: 12,
-    color: colors.primary,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  paidText: {
-    fontSize: 13,
-    color: colors.success,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  pendingText: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-});

@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Button, colors } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { deleteTransaction, getBillPaymentsBetween, getMonthlyBills, getTransactions, markBillPaid, undoBillPayment } from "@/services/api";
 import type { BillPayment, CategoryType, MonthlyBill, Transaction } from "@/services/types";
 import { formatCurrency, formatDate, monthEndISO, monthStartISO } from "@/utils/format";
@@ -13,7 +14,97 @@ import { syncBillReminders } from "@/services/notifications";
 import { useAuth } from "@/hooks/use-auth";
 import { summarizeBillsForMonth, getBillOccurrence } from "@/utils/bills";
 
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    content: {
+      paddingBottom: 24,
+    },
+    summary: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+    },
+    summaryLabel: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 14,
+      fontWeight: "600",
+      textTransform: "capitalize",
+    },
+    summaryValue: {
+      color: "#FFFFFF",
+      fontSize: 26,
+      fontWeight: "800",
+      marginTop: 4,
+    },
+    formCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.text,
+      marginTop: 24,
+      marginBottom: 12,
+    },
+    emptyCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    emptyText: {
+      color: colors.muted,
+      fontSize: 14,
+      textAlign: "center",
+    },
+    row: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    info: {
+      flex: 1,
+    },
+    desc: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    date: {
+      fontSize: 13,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    amount: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    billsSummary: {
+      fontSize: 13,
+      color: colors.muted,
+      fontWeight: "600",
+      marginBottom: 12,
+    },
+  });
+}
+
 export function TransactionManager({ type, title, showBills }: { type: CategoryType; title: string; showBills?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
   const [month, setMonth] = useState(() => new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -43,9 +134,7 @@ export function TransactionManager({ type, title, showBills }: { type: CategoryT
   const total = transactions.reduce((sum, t) => sum + t.amount, 0);
   const billsSummary = summarizeBillsForMonth(bills, payments, month);
   const paidMap = new Map(payments.map((p) => [p.bill_id, p]));
-  const monthBills = bills
-    .filter((b) => b.active && getBillOccurrence(b, month))
-    .sort((a, b) => a.due_day - b.due_day);
+  const monthBills = bills.filter((b) => b.active && getBillOccurrence(b, month)).sort((a, b) => a.due_day - b.due_day);
 
   const handleBillToggle = async (bill: MonthlyBill) => {
     if (!user) {
@@ -154,104 +243,10 @@ export function TransactionManager({ type, title, showBills }: { type: CategoryT
               <Text style={styles.emptyText}>Nenhuma conta neste mês.</Text>
             </View>
           ) : (
-            monthBills.map((bill) => (
-              <BillPaymentRow
-                key={bill.id}
-                bill={bill}
-                payment={paidMap.get(bill.id)}
-                month={month}
-                onToggle={() => handleBillToggle(bill)}
-              />
-            ))
+            monthBills.map((bill) => <BillPaymentRow key={bill.id} bill={bill} payment={paidMap.get(bill.id)} month={month} onToggle={() => handleBillToggle(bill)} />)
           )}
         </>
       ) : null}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingBottom: 24,
-  },
-  summary: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  summaryLabel: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  summaryValue: {
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  formCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 14,
-    textAlign: "center",
-  },
-  row: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  info: {
-    flex: 1,
-  },
-  desc: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  date: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  amount: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  billsSummary: {
-    fontSize: 13,
-    color: colors.muted,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-});

@@ -1,11 +1,63 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Link, useRouter } from "expo-router";
-import { Button, Screen, TextField, colors } from "@/components/ui";
+import { Button, Screen, TextField } from "@/components/ui";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
 import { useBiometricPrompt } from "@/hooks/biometric-prompt";
 
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    flex: {
+      flex: 1,
+      justifyContent: "center",
+    },
+    header: {
+      marginBottom: 32,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: colors.text,
+    },
+    subtitle: {
+      marginTop: 6,
+      fontSize: 15,
+      color: colors.muted,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: 14,
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    notice: {
+      color: colors.primary,
+      fontSize: 14,
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    footer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 6,
+      marginTop: 24,
+    },
+    footerText: {
+      color: colors.muted,
+      fontSize: 15,
+    },
+    link: {
+      color: colors.primary,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+  });
+}
+
 export default function RegisterScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { signUp } = useAuth();
   const { requestBiometricPrompt } = useBiometricPrompt();
   const router = useRouter();
@@ -77,50 +129,3 @@ export default function RegisterScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  subtitle: {
-    marginTop: 6,
-    fontSize: 15,
-    color: colors.muted,
-  },
-  error: {
-    color: colors.danger,
-    fontSize: 14,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  notice: {
-    color: colors.primary,
-    fontSize: 14,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 24,
-  },
-  footerText: {
-    color: colors.muted,
-    fontSize: 15,
-  },
-  link: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-});

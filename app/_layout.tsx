@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, ThemeProvider, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { ThemeProvider as AppThemeProvider, useTheme } from "@/hooks/use-theme";
 import { BiometricGate } from "@/components/biometric-gate";
 import { BiometricPromptProvider } from "@/hooks/biometric-prompt";
 import { getAllBillPayments, getMonthlyBills } from "@/services/api";
@@ -9,19 +10,21 @@ import { syncBillReminders } from "@/services/notifications";
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <BiometricPromptProvider>
-        <BiometricGate>
-          <RootNavigator />
-        </BiometricGate>
-      </BiometricPromptProvider>
-      <StatusBar style="auto" />
-    </AuthProvider>
+    <AppThemeProvider>
+      <AuthProvider>
+        <BiometricPromptProvider>
+          <BiometricGate>
+            <RootNavigator />
+          </BiometricGate>
+        </BiometricPromptProvider>
+      </AuthProvider>
+    </AppThemeProvider>
   );
 }
 
 function RootNavigator() {
   const { session, loading } = useAuth();
+  const { isDark, navTheme } = useTheme();
   const segments = useSegments();
   const router = useRouter();
 
@@ -59,10 +62,13 @@ function RootNavigator() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="bill/[id]" options={{ headerShown: true }} />
-    </Stack>
+    <ThemeProvider value={navTheme}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="bill/[id]" options={{ headerShown: true }} />
+      </Stack>
+    </ThemeProvider>
   );
 }

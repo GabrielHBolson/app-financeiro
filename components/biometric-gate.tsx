@@ -1,9 +1,62 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { authenticateWithBiometrics, isBiometricEnabled } from "@/utils/biometrics";
-import { colors } from "@/components/ui";
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.background,
+      paddingHorizontal: 24,
+    },
+    iconCircle: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: colors.tint,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 24,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    subtitle: {
+      marginTop: 8,
+      fontSize: 15,
+      color: colors.muted,
+      textAlign: "center",
+    },
+    error: {
+      marginTop: 12,
+      fontSize: 14,
+      color: colors.danger,
+      textAlign: "center",
+    },
+    button: {
+      marginTop: 28,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingVertical: 14,
+      paddingHorizontal: 28,
+    },
+    buttonText: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+  });
+}
 
 export function BiometricGate({ children }: { children: ReactNode }) {
   const { session } = useAuth();
@@ -48,6 +101,8 @@ export function BiometricGate({ children }: { children: ReactNode }) {
 }
 
 function LockScreen({ onUnlock }: { onUnlock: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [attempting, setAttempting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const attemptedRef = useRef(false);
@@ -87,54 +142,3 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.background,
-    paddingHorizontal: 24,
-  },
-  iconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: "#E6F4FE",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 15,
-    color: colors.muted,
-    textAlign: "center",
-  },
-  error: {
-    marginTop: 12,
-    fontSize: 14,
-    color: colors.danger,
-    textAlign: "center",
-  },
-  button: {
-    marginTop: 28,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});
