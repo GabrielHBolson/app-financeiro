@@ -3,6 +3,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Switch, Text, View } from "reac
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, Screen, TextField } from "@/components/ui";
+import { AmountInputModal } from "@/components/amount-input-modal";
 import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { MonthPicker } from "@/components/month-picker";
 import { BillPaymentRow } from "@/components/bill-payment-row";
@@ -131,10 +132,12 @@ export default function BillsScreen() {
   const [amount, setAmount] = useState("");
   const [dueDay, setDueDay] = useState("");
   const [isRecurring, setIsRecurring] = useState(true);
+  const [hasVariable, setHasVariable] = useState(false);
   const [totalMonths, setTotalMonths] = useState("12");
   const [startMonth, setStartMonth] = useState(() => new Date());
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [payingBill, setPayingBill] = useState<MonthlyBill | null>(null);
 
   const load = useCallback(async () => {
     const [bl, pl] = await Promise.all([getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
@@ -180,6 +183,7 @@ export default function BillsScreen() {
       is_recurring: isRecurring,
       total_months: isRecurring ? null : months,
       start_month: isRecurring ? null : monthStartISO(startMonth),
+      has_variable_amount: hasVariable,
     });
     setSaving(false);
     if (error) {
@@ -191,6 +195,7 @@ export default function BillsScreen() {
     setDueDay("");
     setTotalMonths("12");
     setStartMonth(new Date());
+    setHasVariable(false);
     setShowForm(false);
     await ensureNotificationPermission();
     await refresh();
@@ -211,7 +216,34 @@ export default function BillsScreen() {
     }
     const monthKey = monthStartISO(month);
     const alreadyPaid = paidMap.has(bill.id);
-    const error = alreadyPaid ? await undoBillPayment(bill.id, monthKey) : await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (alreadyPaid) {
+      const error = await undoBillPayment(bill.id, monthKey);
+      if (error) {
+        Alert.alert("Erro", error);
+        return;
+      }
+      await refresh();
+      return;
+    }
+    if (bill.has_variable_amount) {
+      setPayingBill(bill);
+      return;
+    }
+    const error = await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (error) {
+      Alert.alert("Erro", error);
+      return;
+    }
+    await refresh();
+  };
+
+  const confirmAmountPaid = async (amount: number) => {
+    if (!user || !payingBill) {
+      return;
+    }
+    setPayingBill(null);
+    const monthKey = monthStartISO(month);
+    const error = await markBillPaid(user.id, { bill_id: payingBill.id, month: monthKey, amount });
     if (error) {
       Alert.alert("Erro", error);
       return;
@@ -256,7 +288,8 @@ export default function BillsScreen() {
   );
 
   return (
-    <Screen>
+    <>
+      <Screen>
       <FlatList
         data={monthBills}
         keyExtractor={(item) => item.id}
@@ -288,7 +321,7 @@ export default function BillsScreen() {
             {showForm ? (
               <View style={styles.card}>
                 <TextField label="Nome" value={name} onChangeText={setName} placeholder="Ex.: Aluguel, Internet..." autoCapitalize="sentences" />
-                <TextField label="Valor (R$)" value={amount} onChangeText={setAmount} placeholder="0,00" keyboardType="decimal-pad" />
+                <TextField label={hasVariable ? "Valor médio (R$)" : "Valor (R$)"} value={amount} onChangeText={setAmount} placeholder="0,00" keyboardType="decimal-pad" />
                 <TextField label="Dia de vencimento" value={dueDay} onChangeText={setDueDay} placeholder="Ex.: 10" keyboardType="number-pad" />
 
                 <View style={styles.switchRow}>
@@ -297,6 +330,14 @@ export default function BillsScreen() {
                     <Text style={styles.switchHint}>Paga todo mês, sem data de término.</Text>
                   </View>
                   <Switch value={isRecurring} onValueChange={setIsRecurring} trackColor={{ true: colors.primary }} />
+                </View>
+
+                <View style={styles.switchRow}>
+                  <View style={styles.switchText}>
+                    <Text style={styles.switchTitle}>Valor variável</Text>
+                    <Text style={styles.switchHint}>O valor real pago varia. Informe a média e digite o valor pago ao marcar.</Text>
+                  </View>
+                  <Switch value={hasVariable} onValueChange={setHasVariable} trackColor={{ true: colors.primary }} />
                 </View>
 
                 {!isRecurring ? (
@@ -324,5 +365,12 @@ export default function BillsScreen() {
         ListFooterComponent={<View style={{ height: 140 }} />}
       />
     </Screen>
+    <AmountInputModal
+      visible={payingBill !== null}
+      defaultValue={payingBill?.amount ?? 0}
+      onClose={() => setPayingBill(null)}
+      onConfirm={confirmAmountPaid}
+    />
+    </>
   );
 }

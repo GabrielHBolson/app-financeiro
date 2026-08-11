@@ -30,6 +30,7 @@ App mobile de finanças pessoais (Android/iOS), interface em português (pt-BR) 
 - **Transações:** CRUD de receita/despesa/investimento com valor, data, descrição e categoria; filtro por mês.
 - **Categorias:** CRUD por tipo com ícone emoji; categorias padrão criadas automaticamente no cadastro (trigger `handle_new_user`).
 - **Contas mensais:** `monthly_bills` é apenas a **configuração** da conta (recorrente, todo mês sem fim, ou parcelada com `total_months` + `start_month`; dia de vencimento 1–31; `active`). O pagamento de cada mês é um registro separado em `bill_payments` (um por mês, unique `(bill_id, month)`), com valor, `paid_at` e anotação próprios. Conta não paga **não** é descontada do saldo.
+  - **Valor variável:** flag `has_variable_amount` em `monthly_bills`; o valor cadastrado é uma média/usado como padrão. Ao marcar um pagamento, abre `AmountInputModal` para informar o valor real pago, que é salvo em `bill_payments.amount`. O `BillPaymentRow` mostra "(média)" e, quando pago com valor distinto, "Pago: R$X de R$Y média".
 - **Notificações:** lembrete de vencimento às 09:00 do dia de vencimento (`syncBillReminders`), resincronizadas ao abrir o app e a cada mudança de contas/pagamentos. Parceladas não geram lembrete antes do `start_month`.
 - **Dashboard:** `balance = income − expense − billsPaid − invested`, onde `billsPaid` é a soma dos `bill_payments` do mês selecionado (não a soma das contas cadastradas).
 
@@ -66,7 +67,7 @@ App mobile de finanças pessoais (Android/iOS), interface em português (pt-BR) 
   - Lista "Lançamentos do mês": descrição, data, valor; lápis edita (`TransactionForm` em modo edição), lixeira exclui com `Alert` de confirmação.
   - Dados em `useFocusEffect` via `getTransactions(mês, tipo)`.
   - Edição atualiza `amount`, `description`, `date`, `category_id`; inserção inclui `type`.
-  - Com `showBills` (apenas Gastos): seção "Contas do mês" com resumo "{n} de {m} pagas · R$ pagos" e lista das contas ativas do mês via `BillPaymentRow`; o check marca/desfaz o pagamento do mês selecionado (`markBillPaid`/`undoBillPayment`) e resincroniza lembretes. O total de gastos NÃO inclui contas (evita dupla contagem).
+  - Com `showBills` (apenas Gastos): seção "Contas do mês" com resumo "{n} de {m} pagas · R$ pagos" e lista das contas ativas do mês via `BillPaymentRow`; o check marca/desfaz o pagamento do mês selecionado (`markBillPaid`/`undoBillPayment`) e resincroniza lembretes. Contas com `has_variable_amount` abrem `AmountInputModal` para informar o valor pago. O total de gastos NÃO inclui contas (evita dupla contagem).
 
 ### `(tabs)/bills` Contas mensais
 - Orientada pelo mês: `MonthPicker` no topo; a navegação de mês permite ver qualquer mês (inclusive futuros, para pré-pagamento) e o histórico é sempre por mês.
@@ -74,21 +75,22 @@ App mobile de finanças pessoais (Android/iOS), interface em português (pt-BR) 
 - Botão "+ Nova conta mensal" alterna o formulário:
   - Nome, Valor (R$), Dia de vencimento (1–31, number-pad).
   - Switch "Mensalidade": ligado = recorrente (paga todo mês, sem fim); desligado = exibe "Quantidade de meses" + "Mês de início" (`MonthPicker`).
+  - Switch "Valor variável": quando ligado, o rótulo do campo de valor vira "Valor médio (R$)"; ao marcar o pagamento, abre `AmountInputModal` para informar o valor real pago.
   - Validações: nome, valor > 0, dia 1–31; parcelas exigem meses ≥ 1.
   - Ao salvar: pede permissão de notificação (`ensureNotificationPermission`) e resincroniza lembretes (`refresh` → `syncBillReminders`).
 - Lista do mês (FlatList): apenas contas **ativas** com ocorrência no mês (recorrentes = todos os meses; parceladas = entre `start_month` e `start_month + total_months − 1` via `getBillOccurrence`), ordenadas por `due_day`.
-- Cada linha usa `BillPaymentRow`: nome, "Dia {n} · valor", "Parcela {n}/{total}" quando parcelada, estado "Pago em dd/mm" (verde) ou "Pendente"; tap na linha → `bill/[id]`.
+- Cada linha usa `BillPaymentRow`: nome, "Dia {n} · valor" (com "(média)" quando `has_variable_amount`), "Parcela {n}/{total}" quando parcelada, estado "Pago em dd/mm" (verde) ou "Pendente"; quando pago com valor distinto da média, mostra "Pago: R$X de R$Y média"; tap na linha → `bill/[id]`.
 - Check (círculo) marca/desmarca o pagamento do **mês selecionado** (`monthStartISO(month)`); `Switch` ativa/pausa (`toggleMonthlyBillActive`); lixeira exclui com `Alert`.
 - Contas inativas são escondidas da lista mensal e não contam nos totais.
 - Estado vazio: "Nenhuma conta neste mês."
 
 ### `bill/[id]` Detalhe da conta
 - Header com nome da conta (Stack header).
-- Card resumo azul: nome, valor, "Vence todo dia {n}", "{total} meses · x/y pagas" (prazo) ou "Mensalidade" (recorrente); badge amarelo "Conta pausada" se inativa.
+- Card resumo azul: nome, valor (label "Valor médio" quando `has_variable_amount`), "Vence todo dia {n}", "{total} meses · x/y pagas" (prazo) ou "Mensalidade" (recorrente); badge amarelo "Conta pausada" se inativa.
 - Conta com prazo (`is_recurring=false`): lista "Parcelas" gerada de `start_month`/`created_at` + `total_months` via `addMonths`; cada linha "Parcela {n}/{total}" + mês, valor e check.
 - Conta recorrente: lista "Histórico" dos últimos 12 meses (`buildMonthWindow(12)`, do mês atual para trás), cada linha com mês, estado "Pago em dd/mm" ou "Não pago", valor e check. Meses futuros são pagos via navegação de mês na tela de Contas.
 - Linha paga: valor verde, check preenchido; linha mostra `TextInput` de anotação ("paguei com PIX...").
-- Toggle do check: se já pago → `undoBillPayment`; senão → `markBillPaid` (valor = `bill.amount`).
+- Toggle do check: se já pago → `undoBillPayment`; senão → se `has_variable_amount`, abre `AmountInputModal` para informar o valor pago (padrão = `bill.amount`); caso contrário → `markBillPaid` (valor = `bill.amount`).
 - Anotação salva no `onEndEditing` → `updateBillPaymentDescription`.
 - Recarrega ao entrar (`getMonthlyBill` + `getBillPayments`) e após cada ação; resincroniza lembretes (`syncBillReminders`).
 
@@ -110,23 +112,32 @@ Tabelas (migrações em `supabase/migrations/`):
 
 - `profiles` — `id` (FK `auth.users`), `full_name`
 - `categories` — `user_id`, `name`, `type` (`income` | `expense` | `investment`), `icon`, `color`
-- `transactions` — `user_id`, `category_id`, `type`, `amount` (> 0), `description`, `date`
-- `monthly_bills` — `user_id`, `name`, `amount`, `due_day` (1–31), `is_recurring`, `total_months`, `start_month`, `active`
+- `transactions` — `user_id`, `category_id`, `type` (`income` | `expense` | `investment`), `amount` (> 0), `description`, `date`
+- `monthly_bills` — `user_id`, `name`, `amount`, `has_variable_amount`, `due_day` (1–31), `is_recurring`, `total_months`, `start_month`, `active`
 - `bill_payments` — `bill_id`, `user_id`, `month`, `amount`, `description`, `paid_at`; unique `(bill_id, month)`; índice `bill_payments_user_month_idx (user_id, month)` (migração `0005`) para as consultas mensais
 
 Todas com RLS baseado em `auth.uid() = user_id`.
+
+Migrações:
+- `0001_initial.sql` — schema base: `profiles`, `categories` (ícones padrão `Salary` `💰`, `Alimentação` `🍔`, `Transporte` `🚌`, `Moradia` `🏠`, `Lazer` `🎮`), `transactions`, `monthly_bills`, trigger `handle_new_user`.
+- `0002_investments.sql` — adiciona `investment` ao `check` de `type` em `transactions` e `categories`; insere categoria padrão "Investimentos" `📈`.
+- `0003_bills.sql` — adiciona `is_recurring`, `total_months` a `monthly_bills`; cria `bill_payments` com `unique (bill_id, month)`.
+- `0004_bills_improvements.sql` — adiciona `start_month` a `monthly_bills` e `description` a `bill_payments`.
+- `0005_bills_month_index.sql` — índice `bill_payments_user_month_idx (user_id, month)`.
+- `0006_bills_variable_amount.sql` — adiciona `has_variable_amount boolean default false` a `monthly_bills`.
 
 Tipos TS correspondentes em `services/types.ts`.
 
 ## Convenções de código
 
-- UI no `components/ui.tsx`: `Screen`, `TextField`, `Button`. Cores via `useTheme()` de `hooks/use-theme.tsx` (paletas `lightColors`/`darkColors`, primary `#208AEF`/`#3B9DF2`); não existe export estático `colors`.
+- UI no `components/ui.tsx`: `Screen`, `TextField`, `Button`. Cores via `useTheme()` de `hooks/use-theme.tsx` (paletas `lightColors`/`darkColors`; primary `#208AEF`/`#3B9DF2`; cores semânticas `background`, `surface`, `text`, `muted`, `border`, `danger`, `success`, `income`, `expense`, `tint`); não existe export estático `colors`.
 - Tema: `ThemeProvider` no layout raiz (Sistema/Claro/Escuro, persistido em SecureStore via `utils/theme.ts`). Todos os estilos de tela usam `useTheme()` e um `createStyles(colors)` memoizado. `navTheme` (React Navigation) alimenta headers/tab bar; `StatusBar` em `_layout` usa `style={isDark ? "light" : "dark"}`. Card "Tema" no Perfil (segmento Claro/Escuro/Sistema).
 - Helpers de moeda/data no `utils/format.ts` (`formatCurrency`, `parseAmount`, `monthStartISO`, `monthEndISO`, `addMonths`, `currentMonthLabel`, `formatDate`, `formatPaidAt`, `toISODate`).
 - Regras de contas em `utils/bills.ts`: `getBillOccurrence` (ocorrência de uma conta num mês; `installment`/`totalMonths` para parceladas), `buildMonthWindow` (meses do histórico) e `summarizeBillsForMonth` (totais de contas esperadas/pagas/pendentes do mês, considerando apenas contas ativas com ocorrência).
 - Componente de linha de conta `components/bill-payment-row.tsx` (`BillPaymentRow`), compartilhado entre Contas e Gastos.
+- `components/amount-input-modal.tsx` (`AmountInputModal`), modal para digitar o valor pago real em contas com `has_variable_amount`; usado em Contas, detalhe de conta e Gastos.
 - Acesso a dados via `services/api.ts` (supabase client em `services/supabase.ts`); pagamentos do mês via `getBillPaymentsBetween(from, to)`.
-- Notificações em `services/notifications.ts`; biometria em `utils/biometrics.ts`.
+- Notificações em `services/notifications.ts`; biometria em `utils/biometrics.ts`. Helpers: `ensureNotificationPermission`, `notificationPermissionGranted`, `syncBillReminders`, `computeNextDueDate`, `scheduleBillReminder`, `cancelBillReminder`, `billReminderIdentifier` (canal `contas`, lembrete às 09:00 do dia de vencimento; parceladas não lembram antes de `start_month`).
 - Auth via `hooks/use-auth.tsx` (`useAuth`); prompt biométrico via `hooks/biometric-prompt.tsx`.
 - Textos de UI em pt-BR; valores monetários em BRL.
 - Não adicionar comentários ao código, salvo se solicitado.

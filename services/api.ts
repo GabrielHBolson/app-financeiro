@@ -118,7 +118,7 @@ export async function getMonthlyBills(): Promise<MonthlyBill[]> {
 
 export async function insertMonthlyBill(
   userId: string,
-  input: { name: string; amount: number; due_day: number; is_recurring: boolean; total_months?: number | null; start_month?: string | null }
+  input: { name: string; amount: number; due_day: number; is_recurring: boolean; total_months?: number | null; start_month?: string | null; has_variable_amount?: boolean }
 ): Promise<string | null> {
   const { error } = await supabase
     .from("monthly_bills")
@@ -127,6 +127,7 @@ export async function insertMonthlyBill(
       user_id: userId,
       total_months: input.is_recurring ? null : (input.total_months ?? null),
       start_month: input.is_recurring ? null : (input.start_month ?? null),
+      has_variable_amount: input.has_variable_amount ?? false,
     });
   return error ? error.message : null;
 }

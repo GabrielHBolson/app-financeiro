@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextIn
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "@/components/ui";
+import { AmountInputModal } from "@/components/amount-input-modal";
 import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import {
   getAllBillPayments,
@@ -186,6 +187,7 @@ export default function BillDetailScreen() {
   const [bill, setBill] = useState<MonthlyBill | null>(null);
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payingMonth, setPayingMonth] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!id) {
@@ -243,7 +245,33 @@ export default function BillDetailScreen() {
       return;
     }
     const existing = paidMap.get(monthKey);
-    const error = existing ? await undoBillPayment(bill.id, monthKey) : await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (existing) {
+      const error = await undoBillPayment(bill.id, monthKey);
+      if (error) {
+        Alert.alert("Erro", error);
+        return;
+      }
+      await reload();
+      return;
+    }
+    if (bill.has_variable_amount) {
+      setPayingMonth(monthKey);
+      return;
+    }
+    const error = await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (error) {
+      Alert.alert("Erro", error);
+      return;
+    }
+    await reload();
+  };
+
+  const confirmAmountPaid = async (amount: number) => {
+    if (!user || !bill || !payingMonth) {
+      return;
+    }
+    setPayingMonth(null);
+    const error = await markBillPaid(user.id, { bill_id: bill.id, month: payingMonth, amount });
     if (error) {
       Alert.alert("Erro", error);
       return;
@@ -261,32 +289,39 @@ export default function BillDetailScreen() {
     }
   };
 
-  const renderInstallment = ({ item }: { item: { date: Date; key: string; index: number } }) => (
-    <PaymentRow
-      title={`Parcela ${item.index + 1}/${bill?.total_months ?? item.index + 1}`}
-      subtitle={currentMonthLabel(item.date)}
-      monthKey={item.key}
-      amount={bill?.amount ?? 0}
-      paid={paidMap.get(item.key)}
-      onToggle={handleToggle}
-      onSaveDescription={handleSaveDescription}
-      colors={colors}
-      styles={styles}
-    />
-  );
+  const renderInstallment = ({ item }: { item: { date: Date; key: string; index: number } }) => {
+    const paid = paidMap.get(item.key);
+    return (
+      <PaymentRow
+        title={`Parcela ${item.index + 1}/${bill?.total_months ?? item.index + 1}`}
+        subtitle={currentMonthLabel(item.date)}
+        monthKey={item.key}
+        amount={paid ? paid.amount : (bill?.amount ?? 0)}
+        paid={paid}
+        onToggle={handleToggle}
+        onSaveDescription={handleSaveDescription}
+        colors={colors}
+        styles={styles}
+      />
+    );
+  };
 
-  const renderHistory = ({ item }: { item: Date }) => (
-    <PaymentRow
-      title={currentMonthLabel(item)}
-      monthKey={monthStartISO(item)}
-      amount={bill?.amount ?? 0}
-      paid={paidMap.get(monthStartISO(item))}
-      onToggle={handleToggle}
-      onSaveDescription={handleSaveDescription}
-      colors={colors}
-      styles={styles}
-    />
-  );
+  const renderHistory = ({ item }: { item: Date }) => {
+    const key = monthStartISO(item);
+    const paid = paidMap.get(key);
+    return (
+      <PaymentRow
+        title={currentMonthLabel(item)}
+        monthKey={key}
+        amount={paid ? paid.amount : (bill?.amount ?? 0)}
+        paid={paid}
+        onToggle={handleToggle}
+        onSaveDescription={handleSaveDescription}
+        colors={colors}
+        styles={styles}
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -311,7 +346,8 @@ export default function BillDetailScreen() {
   const history = bill.is_recurring ? buildMonthWindow(12) : [];
 
   return (
-    <Screen>
+    <>
+      <Screen>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -325,6 +361,7 @@ export default function BillDetailScreen() {
 
       <View style={styles.summary}>
         <Text style={styles.summaryName}>{bill.name}</Text>
+        <Text style={styles.summaryMeta}>{bill.has_variable_amount ? "Valor médio" : "Valor"}</Text>
         <Text style={styles.summaryValue}>{formatCurrency(bill.amount)}</Text>
         <Text style={styles.summaryMeta}>Vence todo dia {bill.due_day}</Text>
         {isTerm ? (
@@ -361,5 +398,12 @@ export default function BillDetailScreen() {
         </>
       )}
     </Screen>
+    <AmountInputModal
+      visible={payingMonth !== null}
+      defaultValue={bill?.amount ?? 0}
+      onClose={() => setPayingMonth(null)}
+      onConfirm={confirmAmountPaid}
+    />
+    </>
   );
 }

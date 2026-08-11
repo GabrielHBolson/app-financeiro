@@ -33,6 +33,7 @@ export type MonthlyBill = {
   user_id: string;
   name: string;
   amount: number;
+  has_variable_amount: boolean;
   due_day: number;
   is_recurring: boolean;
   total_months: number | null;

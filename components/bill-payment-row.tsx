@@ -49,6 +49,11 @@ function createStyles(colors: ThemeColors) {
       color: colors.muted,
       marginTop: 2,
     },
+    paidAmount: {
+      fontSize: 12,
+      color: colors.success,
+      marginTop: 2,
+    },
   });
 }
 
@@ -79,6 +84,7 @@ export function BillPaymentRow({
         <Text style={styles.name}>{bill.name}</Text>
         <Text style={styles.meta}>
           Dia {bill.due_day} · {formatCurrency(bill.amount)}
+          {bill.has_variable_amount ? " (média)" : null}
         </Text>
         {occurrence?.installment != null ? (
           <Text style={styles.installment}>
@@ -88,6 +94,9 @@ export function BillPaymentRow({
         <Text style={payment ? styles.paidText : styles.pendingText}>
           {payment ? `Pago em ${formatPaidAt(payment.paid_at)}` : "Pendente"}
         </Text>
+        {bill.has_variable_amount && payment ? (
+          <Text style={styles.paidAmount}>Pago: {formatCurrency(payment.amount)} de {formatCurrency(bill.amount)} média</Text>
+        ) : null}
       </Pressable>
       <Pressable onPress={onToggle} hitSlop={8} disabled={disabled}>
         <Ionicons

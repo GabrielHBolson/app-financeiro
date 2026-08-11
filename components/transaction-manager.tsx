@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "@/components/ui";
+import { AmountInputModal } from "@/components/amount-input-modal";
 import { useTheme, type ThemeColors } from "@/hooks/use-theme";
 import { deleteTransaction, getBillPaymentsBetween, getMonthlyBills, getTransactions, markBillPaid, undoBillPayment } from "@/services/api";
 import type { BillPayment, CategoryType, MonthlyBill, Transaction } from "@/services/types";
@@ -112,6 +113,7 @@ export function TransactionManager({ type, title, showBills }: { type: CategoryT
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [payingBill, setPayingBill] = useState<MonthlyBill | null>(null);
 
   const load = useCallback(async () => {
     const tx = getTransactions(monthStartISO(month), monthEndISO(month), type);
@@ -142,7 +144,40 @@ export function TransactionManager({ type, title, showBills }: { type: CategoryT
     }
     const monthKey = monthStartISO(month);
     const alreadyPaid = paidMap.has(bill.id);
-    const error = alreadyPaid ? await undoBillPayment(bill.id, monthKey) : await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (alreadyPaid) {
+      const error = await undoBillPayment(bill.id, monthKey);
+      if (error) {
+        Alert.alert("Erro", error);
+        return;
+      }
+      const [bl, pl] = await Promise.all([getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
+      setBills(bl);
+      setPayments(pl);
+      syncBillReminders(bl, pl);
+      return;
+    }
+    if (bill.has_variable_amount) {
+      setPayingBill(bill);
+      return;
+    }
+    const error = await markBillPaid(user.id, { bill_id: bill.id, month: monthKey, amount: bill.amount });
+    if (error) {
+      Alert.alert("Erro", error);
+      return;
+    }
+    const [bl, pl] = await Promise.all([getMonthlyBills(), getBillPaymentsBetween(monthStartISO(month), monthEndISO(month))]);
+    setBills(bl);
+    setPayments(pl);
+    syncBillReminders(bl, pl);
+  };
+
+  const confirmAmountPaid = async (amount: number) => {
+    if (!user || !payingBill) {
+      return;
+    }
+    setPayingBill(null);
+    const monthKey = monthStartISO(month);
+    const error = await markBillPaid(user.id, { bill_id: payingBill.id, month: monthKey, amount });
     if (error) {
       Alert.alert("Erro", error);
       return;
@@ -182,7 +217,8 @@ export function TransactionManager({ type, title, showBills }: { type: CategoryT
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <MonthPicker value={month} onChange={setMonth} />
 
       <View style={styles.summary}>
@@ -248,5 +284,12 @@ export function TransactionManager({ type, title, showBills }: { type: CategoryT
         </>
       ) : null}
     </ScrollView>
+    <AmountInputModal
+      visible={payingBill !== null}
+      defaultValue={payingBill?.amount ?? 0}
+      onClose={() => setPayingBill(null)}
+      onConfirm={confirmAmountPaid}
+    />
+    </>
   );
 }
