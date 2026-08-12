@@ -54,6 +54,12 @@ function createStyles(colors: ThemeColors) {
       color: colors.success,
       marginTop: 2,
     },
+    pausedText: {
+      color: "#FBBF24",
+      fontSize: 13,
+      fontWeight: "700",
+      marginTop: 2,
+    },
   });
 }
 
@@ -64,6 +70,7 @@ export function BillPaymentRow({
   onToggle,
   onPressInfo,
   disabled,
+  paused,
   right,
 }: {
   bill: MonthlyBill;
@@ -72,6 +79,7 @@ export function BillPaymentRow({
   onToggle: () => void;
   onPressInfo?: () => void;
   disabled?: boolean;
+  paused?: boolean;
   right?: React.ReactNode;
 }) {
   const { colors } = useTheme();
@@ -94,6 +102,7 @@ export function BillPaymentRow({
         <Text style={payment ? styles.paidText : styles.pendingText}>
           {payment ? `Pago em ${formatPaidAt(payment.paid_at)}` : "Pendente"}
         </Text>
+        {paused ? <Text style={styles.pausedText}>Conta pausada</Text> : null}
         {bill.has_variable_amount && payment ? (
           <Text style={styles.paidAmount}>Pago: {formatCurrency(payment.amount)} de {formatCurrency(bill.amount)} média</Text>
         ) : null}

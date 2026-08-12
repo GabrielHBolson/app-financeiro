@@ -159,6 +159,7 @@ export default function BillsScreen() {
   };
 
   const monthBills = bills.filter((b) => b.active && getBillOccurrence(b, month)).sort((a, b) => a.due_day - b.due_day);
+  const inactiveBills = bills.filter((b) => !b.active && getBillOccurrence(b, month)).sort((a, b) => a.due_day - b.due_day);
 
   const paidMap = new Map(payments.map((p) => [p.bill_id, p]));
   const summary = summarizeBillsForMonth(bills, payments, month);
@@ -269,13 +270,15 @@ export default function BillsScreen() {
     ]);
   };
 
-  const renderBill = ({ item }: { item: MonthlyBill }) => (
+  const renderBill = ({ item, disabled = false }: { item: MonthlyBill; disabled?: boolean }) => (
     <BillPaymentRow
       bill={item}
       payment={paidMap.get(item.id)}
       month={month}
       onToggle={() => handleMarkPaid(item)}
       onPressInfo={() => router.push(`/bill/${item.id}`)}
+      disabled={disabled}
+      paused={!item.active}
       right={
         <>
           <Switch value={item.active} onValueChange={() => handleToggle(item)} trackColor={{ true: colors.primary }} />
@@ -362,7 +365,19 @@ export default function BillsScreen() {
             <Text style={styles.emptyText}>Nenhuma conta neste mês.</Text>
           </View>
         }
-        ListFooterComponent={<View style={{ height: 140 }} />}
+        ListFooterComponent={
+          <>
+            {inactiveBills.length > 0 ? (
+              <View>
+                <Text style={styles.sectionTitle}>Contas inativas</Text>
+                {inactiveBills.map((item) => (
+                  <View key={item.id}>{renderBill({ item, disabled: true })}</View>
+                ))}
+              </View>
+            ) : null}
+            <View style={{ height: 140 }} />
+          </>
+        }
       />
     </Screen>
     <AmountInputModal

@@ -78,10 +78,10 @@ App mobile de finanças pessoais (Android/iOS), interface em português (pt-BR) 
   - Switch "Valor variável": quando ligado, o rótulo do campo de valor vira "Valor médio (R$)"; ao marcar o pagamento, abre `AmountInputModal` para informar o valor real pago.
   - Validações: nome, valor > 0, dia 1–31; parcelas exigem meses ≥ 1.
   - Ao salvar: pede permissão de notificação (`ensureNotificationPermission`) e resincroniza lembretes (`refresh` → `syncBillReminders`).
-- Lista do mês (FlatList): apenas contas **ativas** com ocorrência no mês (recorrentes = todos os meses; parceladas = entre `start_month` e `start_month + total_months − 1` via `getBillOccurrence`), ordenadas por `due_day`.
+- Lista do mês (FlatList): apenas contas **ativas** com ocorrência no mês (recorrentes = todos os meses; parceladas = entre `start_month` e `start_month + total_months − 1` via `getBillOccurrence`), ordenadas por `due_day`. Abaixo dela, se houver, a seção "Contas inativas" (`ListFooterComponent`) lista as contas inativas com ocorrência no mês selecionado.
 - Cada linha usa `BillPaymentRow`: nome, "Dia {n} · valor" (com "(média)" quando `has_variable_amount`), "Parcela {n}/{total}" quando parcelada, estado "Pago em dd/mm" (verde) ou "Pendente"; quando pago com valor distinto da média, mostra "Pago: R$X de R$Y média"; tap na linha → `bill/[id]`.
-- Check (círculo) marca/desmarca o pagamento do **mês selecionado** (`monthStartISO(month)`); `Switch` ativa/pausa (`toggleMonthlyBillActive`); lixeira exclui com `Alert`.
-- Contas inativas são escondidas da lista mensal e não contam nos totais.
+- Check (círculo) marca/desmarca o pagamento do **mês selecionado** (`monthStartISO(month)`); `Switch` ativa/pausa (`toggleMonthlyBillActive`); lixeira exclui com `Alert`. Nas linhas de contas inativas o check fica desabilitado (`disabled`) e a linha exibe o badge "Conta pausada".
+- Contas inativas são escondidas da lista mensal, aparecem na seção "Contas inativas" (somente com ocorrência no mês selecionado) e não contam nos totais.
 - Estado vazio: "Nenhuma conta neste mês."
 
 ### `bill/[id]` Detalhe da conta
@@ -134,7 +134,7 @@ Tipos TS correspondentes em `services/types.ts`.
 - Tema: `ThemeProvider` no layout raiz (Sistema/Claro/Escuro, persistido em SecureStore via `utils/theme.ts`). Todos os estilos de tela usam `useTheme()` e um `createStyles(colors)` memoizado. `navTheme` (React Navigation) alimenta headers/tab bar; `StatusBar` em `_layout` usa `style={isDark ? "light" : "dark"}`. Card "Tema" no Perfil (segmento Claro/Escuro/Sistema).
 - Helpers de moeda/data no `utils/format.ts` (`formatCurrency`, `parseAmount`, `monthStartISO`, `monthEndISO`, `addMonths`, `currentMonthLabel`, `formatDate`, `formatPaidAt`, `toISODate`).
 - Regras de contas em `utils/bills.ts`: `getBillOccurrence` (ocorrência de uma conta num mês; `installment`/`totalMonths` para parceladas), `buildMonthWindow` (meses do histórico) e `summarizeBillsForMonth` (totais de contas esperadas/pagas/pendentes do mês, considerando apenas contas ativas com ocorrência).
-- Componente de linha de conta `components/bill-payment-row.tsx` (`BillPaymentRow`), compartilhado entre Contas e Gastos.
+- Componente de linha de conta `components/bill-payment-row.tsx` (`BillPaymentRow`), compartilhado entre Contas e Gastos; prop opcional `paused` exibe o badge "Conta pausada" em âmbar (linhas de contas inativas) e `disabled` desabilita o check de pagamento.
 - `components/amount-input-modal.tsx` (`AmountInputModal`), modal para digitar o valor pago real em contas com `has_variable_amount`; usado em Contas, detalhe de conta e Gastos.
 - Acesso a dados via `services/api.ts` (supabase client em `services/supabase.ts`); pagamentos do mês via `getBillPaymentsBetween(from, to)`.
 - Notificações em `services/notifications.ts`; biometria em `utils/biometrics.ts`. Helpers: `ensureNotificationPermission`, `notificationPermissionGranted`, `syncBillReminders`, `computeNextDueDate`, `scheduleBillReminder`, `cancelBillReminder`, `billReminderIdentifier` (canal `contas`, lembrete às 09:00 do dia de vencimento; parceladas não lembram antes de `start_month`).
